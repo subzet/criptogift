@@ -8,14 +8,14 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract Crowfund is Ownable {
     struct Contributor {
         uint256 amountContributed;
+        string message;
     }
 
     struct Project {
         uint256 deadline;
-        uint256 threshold;
+        uint256 amountContributed;
         bool exists;
         address owner;
-        mapping(address => Contributor) contributors;
     }
 
     mapping(address => Project) receivers;
@@ -24,7 +24,6 @@ contract Crowfund is Ownable {
         address receiver,
         address owner,
         uint256 deadline,
-        uint256 threshold,
         uint256 createdAt
     );
 
@@ -35,29 +34,26 @@ contract Crowfund is Ownable {
         uint256 deletedAt
     );
 
-    function projectExists(address _addr) public view returns (bool) {
+    event ProjectDonation(address receiver, uint256 amount);
+
+    function projectExists(address _addr) private view returns (bool) {
         return receivers[_addr].exists;
     }
 
-    function createProject(
-        uint256 _deadline,
-        uint256 _threshold,
-        address _receiver
-    ) public {
+    function createProject(uint256 _deadline, address _receiver) public {
         require(projectExists(_receiver) == false, "Project already exists");
+
+        require(
+            block.timestamp < _deadline,
+            "Deadline should be in the future"
+        );
 
         receivers[_receiver].deadline = _deadline;
         receivers[_receiver].exists = true;
-        receivers[_receiver].threshold = _threshold;
         receivers[_receiver].owner = msg.sender;
+        receivers[_receiver].amountContributed = 0;
 
-        emit ProjectCreated(
-            _receiver,
-            msg.sender,
-            _deadline,
-            _threshold,
-            block.timestamp
-        );
+        emit ProjectCreated(_receiver, msg.sender, _deadline, block.timestamp);
     }
 
     function getProject(address _receiver)
@@ -65,19 +61,29 @@ contract Crowfund is Ownable {
         view
         returns (
             uint256, //deadline
-            uint256, //threshold
             bool, //exists
-            address //owner
+            address, //owner
+            uint256 // amount contributed
         )
     {
         require(projectExists(_receiver) == true, "Project does not exists");
 
         return (
             receivers[_receiver].deadline,
-            receivers[_receiver].threshold,
             receivers[_receiver].exists,
-            receivers[_receiver].owner
+            receivers[_receiver].owner,
+            receivers[_receiver].amountContributed
         );
+    }
+
+    function getTotalAmountContributed(address _receiver)
+        public
+        view
+        returns (uint256)
+    {
+        require(projectExists(_receiver) == true, "Project does not exists");
+
+        return receivers[_receiver].amountContributed;
     }
 
     function deleteProject(address _receiver) public {
@@ -96,5 +102,35 @@ contract Crowfund is Ownable {
             msg.sender,
             block.timestamp
         );
+    }
+
+    function contribute(address _receiver) public payable {
+        require(projectExists(_receiver) == true, "Project does not exists");
+
+        require(
+            block.timestamp < receivers[_receiver].deadline,
+            "Project crowdfund has already finished."
+        );
+
+        require(msg.value > 0, "You must provider a value greater than 0");
+
+        receivers[_receiver].amountContributed += msg.value;
+    }
+
+    function resetProject() private {
+        receivers[msg.sender].exists = false;
+    }
+
+    function claim() public {
+        require(projectExists(msg.sender) == true, "Project does not exists");
+
+        require(
+            block.timestamp > receivers[msg.sender].deadline,
+            "Can't withdraw yet"
+        );
+
+        payable(msg.sender).transfer(receivers[msg.sender].amountContributed);
+
+        resetProject();
     }
 }
