@@ -4,12 +4,10 @@ pragma solidity ^0.8.9;
 // Import this file to use console.log
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 contract Crowfund is Ownable {
-    struct Contributor {
-        uint256 amountContributed;
-        string message;
-    }
+    using SafeMath for uint256;
 
     struct Project {
         uint256 deadline;
@@ -56,7 +54,9 @@ contract Crowfund is Ownable {
         emit ProjectCreated(_receiver, msg.sender, _deadline, block.timestamp);
     }
 
-    function getProject(address _receiver)
+    function getProject(
+        address _receiver
+    )
         public
         view
         returns (
@@ -76,11 +76,9 @@ contract Crowfund is Ownable {
         );
     }
 
-    function getTotalAmountContributed(address _receiver)
-        public
-        view
-        returns (uint256)
-    {
+    function getTotalAmountContributed(
+        address _receiver
+    ) public view returns (uint256) {
         require(projectExists(_receiver) == true, "Project does not exists");
 
         return receivers[_receiver].amountContributed;
@@ -114,7 +112,11 @@ contract Crowfund is Ownable {
 
         require(msg.value > 0, "You must provider a value greater than 0");
 
-        receivers[_receiver].amountContributed += msg.value;
+        receivers[_receiver].amountContributed = receivers[_receiver]
+            .amountContributed
+            .add(msg.value);
+
+        emit ProjectDonation(_receiver, msg.value);
     }
 
     function resetProject() private {
@@ -129,8 +131,10 @@ contract Crowfund is Ownable {
             "Can't withdraw yet"
         );
 
-        payable(msg.sender).transfer(receivers[msg.sender].amountContributed);
+        uint256 amount = receivers[msg.sender].amountContributed;
 
         resetProject();
+
+        payable(msg.sender).transfer(amount);
     }
 }
