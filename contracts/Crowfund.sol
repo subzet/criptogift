@@ -110,6 +110,8 @@ contract Crowfund is Ownable {
             "Project crowdfund has already finished."
         );
 
+        require(_receiver != address(0), "Receiver address can not be 0x0");
+
         require(msg.value > 0, "You must provider a value greater than 0");
 
         receivers[_receiver].amountContributed = receivers[_receiver]
